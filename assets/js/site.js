@@ -15,32 +15,58 @@
 })();
 
 /**
- * Marquee thumbnails
- * - Keep the current placeholders visible.
- * - If a data-src is present and loads successfully, swap it in.
- * - If it fails (404), silently keep the placeholder.
+ * Try-load helper: attempts a list of URLs in order; calls onFirstSuccess with the first that loads.
+ * If none load, does nothing (keeps placeholder).
  */
+function tryLoad(urls, onFirstSuccess) {
+  if (!urls || !urls.length) return;
+  let i = 0;
+  const tryNext = () => {
+    if (i >= urls.length) return;
+    const u = urls[i++];
+    if (!u) return tryNext();
+    const img = new Image();
+    img.onload = () => onFirstSuccess(u);
+    img.onerror = tryNext; // quietly try next
+    img.src = u;
+  };
+  tryNext();
+}
+
+/**
+ * Turn a placeholder path like ".../17845536033442720.jpg.svg"
+ * into candidate real image names we’ll try in order:
+ *   1) (explicit it.image if provided)
+ *   2) base-without-.svg + ".jpg"
+ *   3) base-without-.svg + ".jpeg"
+ *   4) base-without-.svg + ".png"
+ */
+function candidateImages(it) {
+  const cands = [];
+  const ph = it.placeholder || "";
+  if (it.image) cands.push(it.image);
+  if (ph.endsWith(".svg")) {
+    const base = ph.slice(0, -4); // remove ".svg"
+    cands.push(base);             // if placeholder already ends with .jpg.svg → first try ".jpg"
+    if (!base.endsWith(".jpg")) cands.push(base + ".jpg");
+    cands.push(base + ".jpeg");
+    cands.push(base + ".png");
+  }
+  return Array.from(new Set(cands)); // unique
+}
+
+/** Marquee: keep placeholder; try to swap to real image if it exists */
 (function () {
   document.querySelectorAll(".marquee img").forEach((img) => {
     const real = img.getAttribute("data-src");
     if (!real) return;
-
-    const probe = new Image();
-    probe.onload = () => {
-      img.src = real; // swap only if the real file exists
-    };
-    // If it 404s, we do nothing and leave the placeholder showing
-    probe.src = real;
+    tryLoad([real], (good) => {
+      img.src = good;
+    });
   });
 })();
 
-/**
- * Gallery population from data/artworks.json
- * Strategy:
- *  - Always show a working image immediately (placeholder if needed).
- *  - Try to load the real JPG/PNG. If it loads, swap to it.
- *  - If it fails, stay on the placeholder (no broken tiles).
- */
+/** Build the grids from data/artworks.json with smart fallback */
 fetch("data/artworks.json")
   .then((r) => r.json())
   .then((items) => {
@@ -54,7 +80,6 @@ fetch("data/artworks.json")
     };
 
     items.forEach((it) => {
-      // pick container by series (fallback to 'mixed')
       let target = null;
       if (it.series === "Textile Monotypes") target = mount.textile;
       else if (it.series === "Architecture Linocuts") target = mount.arch;
@@ -65,36 +90,27 @@ fetch("data/artworks.json")
 
       if (!target) return;
 
-      // Create tile
+      // Tile shell
       const tile = document.createElement("div");
       tile.className = "tile";
 
-      // Image element — show something immediately
+      // Start with placeholder (always exists in your repo)
       const img = document.createElement("img");
-      // Start with placeholder (always exists in v5)
-      const placeholder = it.placeholder || it.image || "";
-      const real = it.image || "";
       img.alt = it.alt || it.title || "";
-
-      // Use the placeholder as the first visible image
+      const placeholder = it.placeholder || ""; // e.g., assets/img/1784....jpg.svg
       if (placeholder) img.src = placeholder;
 
-      // Try to load real image (only if provided and different)
-      if (real && real !== placeholder) {
-        const probe = new Image();
-        probe.onload = () => {
-          img.src = real; // swap to real image only if it loads
-        };
-        // If it fails, keep placeholder (no errors shown)
-        probe.src = real;
-      }
+      // Try to swap to a real file if any candidate loads
+      const candidates = candidateImages(it);
+      tryLoad(
+        candidates.filter(Boolean),
+        (good) => (img.src = good)
+      );
 
       // Meta
       const meta = document.createElement("div");
       meta.className = "meta";
-      meta.innerHTML = `<strong>${it.title || ""}</strong><div>${
-        it.technique || ""
-      }${it.year ? " · " + it.year : ""}</div>`;
+      meta.innerHTML = `<strong>${it.title || ""}</strong><div>${it.technique || ""}${it.year ? " · " + it.year : ""}</div>`;
 
       tile.appendChild(img);
       tile.appendChild(meta);
@@ -102,6 +118,5 @@ fetch("data/artworks.json")
     });
   })
   .catch((err) => {
-    // If the data file can't be loaded, fail silently (keeps the rest of the page working)
     console.warn("artworks.json not loaded:", err);
   });
