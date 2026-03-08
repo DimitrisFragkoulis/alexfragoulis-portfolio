@@ -1,7 +1,10 @@
-# Alex Fragoulis — Portfolio v5 (GitHub Pages ready)
+# Alex Fragoulis — Aglaia-style Landing (Coming Soon)
 
-1) Upload ALL files in this folder to your repo root.
-2) Repo → Settings → Pages → Source: Deploy from branch; Branch: main; Folder: /(root)
-3) Visit https://USERNAME.github.io/REPO-NAME/
+This is a minimal landing page that mirrors the look & feel of a simple 'Coming Soon' page with a single Instagram CTA.
 
-To add works later: put images in assets/img and add entries in data/artworks.json.
+## How to publish on GitHub Pages
+1) Upload **index.html** and the **assets/** folder to your repo root (overwrite current index.html).
+2) Settings → Pages → Source: *Deploy from branch* ; Branch: *main* ; Folder: */ (root)* ; Save.
+3) Open your site. You should see the big 'Coming Soon' heading and the Instagram button.
+
+> Your previous pages (printmaking.html, illustration.html, other.html) can stay in the repo. They will remain accessible via direct URL, but the landing will match the minimal style.
